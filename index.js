@@ -17,7 +17,7 @@ const wsServer = new WebSocketServer({ server: httpServer });
 wsServer.on("connection", (socket) => {
   const socketId = crypto.randomBytes(12).toString("hex");
   socket.id = socketId;
-  handleMessages({ socket, wsServer });
+  handleMessages({ socket, server: wsServer });
   socket.on("close", () => {
     socket.emit(
       "message",

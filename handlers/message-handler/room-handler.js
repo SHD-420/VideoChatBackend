@@ -26,7 +26,7 @@ module.exports = function (message, socketId) {
     return response(msgTypes.outgoing.ROOM.CREATED, roomId);
   }
   function joinRoom() {
-    const targetRoom = ROOMS.get(message.data.roomId);
+    const targetRoom = ROOMS.get(message.data.roomId.toUpperCase());
     if (targetRoom)
       return response(
         msgTypes.outgoing.ROOM.JOIN_REQ,
@@ -47,20 +47,38 @@ module.exports = function (message, socketId) {
       ];
     }
   }
-  function handleUserDisconnect() {
-    const roomVals = Array.from(ROOMS.values());
-    const ownedRoom = roomVals.find((r) => r.owner === socketId);
-    if (ownedRoom) {
-      ROOMS.delete(socketId);
-      return response(
-        msgTypes.outgoing.ROOM.DESTROYED,
-        null,
-        ownedRoom.members
-      );
+
+  function removeMember() {
+    const { socketId: targetUser, roomId } = message.data;
+    const targetRoom = ROOMS.get(roomId);
+    if (targetRoom && targetRoom.owner === socketId) {
+      targetRoom.members = targetRoom.members.filter((m) => m != targetUser);
+      return [
+        response(msgTypes.outgoing.ROOM.MEMBER_GOT_REMOVED, targetUser, [
+          ...targetRoom.members,
+          targetRoom.owner,
+        ]),
+        response(msgTypes.outgoing.ROOM.YOU_GOT_REMOVED, null, targetUser),
+      ];
     }
-    const joinedRoom = roomVals.find((r) => r.members.includes(socketId));
+  }
+
+  function handleUserDisconnect() {
+    const ownedRoomEntry = [...ROOMS.entries()].find(
+      ([_, room]) => room.owner === socketId
+    );
+    if (ownedRoomEntry) {
+      const [roomId, room] = ownedRoomEntry;
+      if (room) {
+        ROOMS.delete(roomId);
+        return response(msgTypes.outgoing.ROOM.DESTROYED, null, room.members);
+      }
+    }
+    const joinedRoom = [...ROOMS.values()].find((r) =>
+      r.members.includes(socketId)
+    );
     if (joinedRoom) {
-      // TODO: remove member from joinedRoom.members
+      joinedRoom.members = joinedRoom.members.filter((m) => m != socketId);
       return response(msgTypes.outgoing.ROOM.MEMBER_LEFT, socketId, [
         ...joinedRoom.members,
         joinedRoom.owner,
@@ -75,7 +93,12 @@ module.exports = function (message, socketId) {
       return joinRoom();
     case msgTypes.incomming.ROOM.ACCEPT_JOIN_REQ:
       return acceptJoinReq();
+    case msgTypes.incomming.ROOM.REMOVE:
+      return removeMember();
     case msgTypes.incomming.ROOM.USER_DISCONNECTED:
       return handleUserDisconnect();
   }
 };
+
+module.exports.getRooms = () =>
+  [...ROOMS].map(([id, data]) => ({ id, ...data }));

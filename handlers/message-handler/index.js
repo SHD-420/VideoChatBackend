@@ -43,7 +43,10 @@ module.exports = function ({ socket, server }) {
     // handle room oriented messages
     if (Object.values(msgTypes.incomming.ROOM).includes(data.type)) {
       const response = handleRoomMsg(data, socket.id);
-      sendResponse(response);
+
+      // HandleRoomMsg always returns a promise resolving to response
+      if (response instanceof Promise)
+        response.then((result) => sendResponse(result));
     } else if (Object.values(msgTypes.incomming.RTC).includes(data.type)) {
       const response = handleRTCMsg(data, socket.id);
       sendResponse(response);

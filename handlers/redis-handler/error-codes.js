@@ -1,0 +1,5 @@
+module.exports.ERROR_CODES = {
+  ROOM_NOT_FOUND: 404,
+  MEMBER_NOT_FOUND: 401,
+  USER_HAS_ROOM: 422,
+};

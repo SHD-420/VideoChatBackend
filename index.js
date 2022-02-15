@@ -3,12 +3,14 @@ const { Server: WebSocketServer } = require("ws");
 const crypto = require("crypto");
 const handleMessages = require("./handlers/message-handler");
 const { incomming } = require("./handlers/message-handler/message-types");
-const { getRooms } = require("./handlers/message-handler/room-handler");
+const { getAllRooms } = require("./handlers/redis-handler/helpers");
 
 const PORT = process.env.PORT || 8000;
 
 const httpServer = http.createServer((_, res) => {
-  res.end(JSON.stringify(getRooms()));
+  getAllRooms().then((rooms) => {
+    res.end(JSON.stringify(rooms));
+  });
 });
 
 httpServer.listen(PORT, () => console.log(`Listening on port:${PORT}`));

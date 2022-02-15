@@ -1,89 +1,76 @@
 const msgTypes = require("./message-types");
-const crypto = require("crypto");
-const ROOMS = new Map();
-
-function getRandomRoomId() {
-  const gen = () => crypto.randomBytes(3).toString("hex").toUpperCase();
-  let roomId;
-  do roomId = gen();
-  while (ROOMS.has(roomId));
-  return roomId;
-}
+const redis = require("../redis-handler/helpers");
 
 module.exports = function (message, socketId) {
   function response(type, data = null, targets = [socketId]) {
     return { message: { type, data }, targets };
   }
-  function createRoom() {
-    if (Array.from(ROOMS.values()).some((r) => r.owner === socketId)) {
+  async function createRoom() {
+    try {
+      const roomId = await redis.createRoom(socketId);
+      return response(msgTypes.outgoing.ROOM.CREATED, roomId);
+    } catch {
       return response(msgTypes.outgoing.ROOM.CREATE_ERROR);
     }
-    const roomId = getRandomRoomId();
-    ROOMS.set(roomId, {
-      owner: socketId,
-      members: [],
-    });
-    return response(msgTypes.outgoing.ROOM.CREATED, roomId);
   }
-  function joinRoom() {
-    const targetRoom = ROOMS.get(message.data.roomId.toUpperCase());
-    if (targetRoom)
+
+  async function joinRoom() {
+    try {
+      const roomOwner = await redis.getOwner(message.data.roomId.toUpperCase());
       return response(
         msgTypes.outgoing.ROOM.JOIN_REQ,
         { ...message.data.user, socketId },
-        [targetRoom.owner]
+        [roomOwner]
       );
-    else return response(msgTypes.outgoing.ROOM.JOIN_ERROR);
+    } catch {
+      return response(msgTypes.outgoing.ROOM.JOIN_ERROR);
+    }
   }
-  function acceptJoinReq() {
-    const { socketId: joinee, roomId } = message.data;
-    const targetRoom = ROOMS.get(roomId);
-    if (targetRoom) {
-      const targetRoomMembers = [...targetRoom.members, targetRoom.owner];
-      targetRoom.members.push(joinee);
+  async function acceptJoinReq() {
+    try {
+      const { socketId: joinee, roomId } = message.data;
+      const roomMembers = await redis.getAllMembers(roomId);
+      await redis.addMember(roomId, joinee);
       return [
         response(msgTypes.outgoing.ROOM.JOINED, roomId, [joinee]),
-        response(msgTypes.outgoing.ROOM.NEW_MEMBER, joinee, targetRoomMembers),
+        response(msgTypes.outgoing.ROOM.NEW_MEMBER, joinee, roomMembers),
       ];
+    } catch (error) {
+      console.log(error);
     }
   }
 
-  function removeMember() {
-    const { socketId: targetUser, roomId } = message.data;
-    const targetRoom = ROOMS.get(roomId);
-    if (targetRoom && targetRoom.owner === socketId) {
-      targetRoom.members = targetRoom.members.filter((m) => m != targetUser);
-      return [
-        response(msgTypes.outgoing.ROOM.MEMBER_GOT_REMOVED, targetUser, [
-          ...targetRoom.members,
-          targetRoom.owner,
-        ]),
-        response(msgTypes.outgoing.ROOM.YOU_GOT_REMOVED, null, targetUser),
-      ];
-    }
-  }
-
-  function handleUserDisconnect() {
-    const ownedRoomEntry = [...ROOMS.entries()].find(
-      ([_, room]) => room.owner === socketId
-    );
-    if (ownedRoomEntry) {
-      const [roomId, room] = ownedRoomEntry;
-      if (room) {
-        ROOMS.delete(roomId);
-        return response(msgTypes.outgoing.ROOM.DESTROYED, null, room.members);
+  async function removeMember() {
+    try {
+      const { socketId: member, roomId } = message.data;
+      const owner = await redis.getOwner(roomId);
+      if (owner === socketId) {
+        await redis.removeMember(roomId, member);
+        const remainingMembers = await redis.getAllMembers(roomId);
+        return [
+          response(
+            msgTypes.outgoing.ROOM.MEMBER_GOT_REMOVED,
+            member,
+            remainingMembers
+          ),
+          response(msgTypes.outgoing.ROOM.YOU_GOT_REMOVED, null, member),
+        ];
       }
+    } catch (error) {
+      console.log(error);
     }
-    const joinedRoom = [...ROOMS.values()].find((r) =>
-      r.members.includes(socketId)
-    );
-    if (joinedRoom) {
-      joinedRoom.members = joinedRoom.members.filter((m) => m != socketId);
-      return response(msgTypes.outgoing.ROOM.MEMBER_LEFT, socketId, [
-        ...joinedRoom.members,
-        joinedRoom.owner,
-      ]);
-    }
+  }
+
+  async function handleUserDisconnect() {
+    const { destryedRooms, leftRooms } = await redis.disconnectUser(socketId);
+    const destroyedTargets = destryedRooms.map((room) => room.members).flat();
+    const leftTargets = leftRooms
+      .map((room) => [...room.members, room.owner])
+      .flat();
+    return [
+      response(msgTypes.outgoing.ROOM.DESTROYED, null, destroyedTargets),
+      response(msgTypes.outgoing.ROOM.MEMBER_LEFT, socketId, leftTargets),
+    ];
   }
 
   switch (message.type) {
@@ -99,6 +86,3 @@ module.exports = function (message, socketId) {
       return handleUserDisconnect();
   }
 };
-
-module.exports.getRooms = () =>
-  [...ROOMS].map(([id, data]) => ({ id, ...data }));

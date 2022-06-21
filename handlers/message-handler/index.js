@@ -15,7 +15,7 @@ module.exports = function ({ socket, server }) {
       const jsonMessage = JSON.parse(message);
       return jsonMessage;
     } catch (error) {
-      if (error instanceof SyntaxError) return {};
+      if (error instanceof SyntaxError) return null;
     }
   }
 
@@ -41,26 +41,18 @@ module.exports = function ({ socket, server }) {
   socket.on("message", (message) => {
     const data = parseMessage(message);
 
-    //--- FOR DEBUGGING ONLY ---
-    if (data.type === "GET_CLIENTS") {
-      sendResponse({
-        message: Array.from(server.clients).map((c) => c.id),
-        targets: [socket.id],
-      });
-      return;
-    }
-    // ------------------------
+    if (data) {
+      // handle room oriented messages
+      if (Object.values(msgTypes.incomming.ROOM).includes(data.type)) {
+        const response = handleRoomMsg(data, socket.id);
 
-    // handle room oriented messages
-    if (Object.values(msgTypes.incomming.ROOM).includes(data.type)) {
-      const response = handleRoomMsg(data, socket.id);
-
-      // HandleRoomMsg always returns a promise resolving to response
-      if (response instanceof Promise)
-        response.then((result) => sendResponse(result));
-    } else if (Object.values(msgTypes.incomming.RTC).includes(data.type)) {
-      const response = handleRTCMsg(data, socket.id);
-      sendResponse(response);
+        // HandleRoomMsg always returns a promise resolving to response
+        if (response instanceof Promise)
+          response.then((result) => sendResponse(result));
+      } else if (Object.values(msgTypes.incomming.RTC).includes(data.type)) {
+        const response = handleRTCMsg(data, socket.id);
+        sendResponse(response);
+      }
     }
   });
 };

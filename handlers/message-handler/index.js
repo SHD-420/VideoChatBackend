@@ -40,6 +40,17 @@ module.exports = function ({ socket, server }) {
 
   socket.on("message", (message) => {
     const data = parseMessage(message);
+
+    //--- FOR DEBUGGING ONLY ---
+    if (data.type === "GET_CLIENTS") {
+      sendResponse({
+        message: Array.from(server.clients).map((c) => c.id),
+        targets: [socket.id],
+      });
+      return;
+    }
+    // ------------------------
+
     // handle room oriented messages
     if (Object.values(msgTypes.incomming.ROOM).includes(data.type)) {
       const response = handleRoomMsg(data, socket.id);

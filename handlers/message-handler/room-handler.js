@@ -84,5 +84,7 @@ module.exports = function (message, socketId) {
       return removeMember();
     case msgTypes.incomming.ROOM.USER_DISCONNECTED:
       return handleUserDisconnect();
+    default:
+      return null;
   }
 };

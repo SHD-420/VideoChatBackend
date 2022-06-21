@@ -26,5 +26,7 @@ module.exports = function (message, socketId) {
       return response(outMsg.ICE_CANDIDATE, {
         candidate: message.data.candidate,
       });
+    default:
+      return null;
   }
 };

@@ -42,16 +42,14 @@ module.exports = function ({ socket, server }) {
     const data = parseMessage(message);
 
     if (data) {
-      // handle room oriented messages
-      if (Object.values(msgTypes.incomming.ROOM).includes(data.type)) {
-        const response = handleRoomMsg(data, socket.id);
-
-        // HandleRoomMsg always returns a promise resolving to response
-        if (response instanceof Promise)
-          response.then((result) => sendResponse(result));
-      } else if (Object.values(msgTypes.incomming.RTC).includes(data.type)) {
-        const response = handleRTCMsg(data, socket.id);
-        sendResponse(response);
+      // handleRTCMsg returns null if it doesn't have implementation
+      // to handle the message (or it needs to be forwarded to handleRoomMsg)
+      const rtcResponse = handleRTCMsg(data, socket.id);
+      if (rtcResponse) sendResponse(rtcResponse);
+      else {
+        const roomMsgResponse = handleRoomMsg(data, socket.id);
+        if (roomMsgResponse instanceof Promise)
+          roomMsgResponse.then((result) => sendResponse(result));
       }
     }
   });

@@ -6,11 +6,7 @@ module.exports.incomming = {
     ACCEPT_JOIN_REQ: "ACCEPT_JOIN_ROOM_REQ",
     USER_DISCONNECTED: "USER_DISCONNECTED"
   },
-  RTC: {
-    OFFER: "RTC_OFFER",
-    ANS: "RTC_ANSWER",
-    ICE_CANDIDATE: "RTC_ICE_CANDIDATE",
-  },
+  RTC_EVENT: "0",
 };
 
 module.exports.outgoing = {
@@ -27,9 +23,5 @@ module.exports.outgoing = {
     YOU_GOT_REMOVED: "SELF_GOT_REMOVED",
     DESTROYED: "DESTROYED_ROOM",
   },
-  RTC: {
-    OFFER: "RTC_OFFER",
-    ANS: "RTC_ANSWER",
-    ICE_CANDIDATE: "RTC_ICE_CANDIDATE",
-  },
+  RTC_EVENT: "0",
 };

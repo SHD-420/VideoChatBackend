@@ -1,10 +1,9 @@
 const IORedis = require("ioredis");
+const { env } = require("../../.");
 
-const redisUser = "default";
-const redisPassword = "Mg6bh6JCsZFXvAHpvjHwA6IflWJaZaOy";
-const redisDB = "redis-17351.c1.ap-southeast-1-1.ec2.cloud.redislabs.com:17351";
-const redisURL = `redis://${redisUser}:${redisPassword}@${redisDB}`;
+const redisURL = `redis://${env.REDIS_USER}:${env.REDIS_PASSWORD}@${env.REDIS_HOST}:${env.REDIS_PORT}`;
 const redis = new IORedis(redisURL);
+
 module.exports.redis = redis;
 
 module.exports.isRedisConnected = () => redis.status == "ready";

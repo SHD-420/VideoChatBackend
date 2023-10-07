@@ -1,7 +1,6 @@
 const WebSocket = require("ws");
 const msgTypes = require("./message-types");
 const handleRoomMsg = require("./room-handler");
-const handleRTCMsg = require("./rtc-handler");
 
 module.exports = function ({ socket, server }) {
   socket.send(
@@ -42,15 +41,19 @@ module.exports = function ({ socket, server }) {
     const data = parseMessage(message);
 
     if (data) {
-      // handleRTCMsg returns null if it doesn't have implementation
-      // to handle the message (or it needs to be forwarded to handleRoomMsg)
-      const rtcResponse = handleRTCMsg(data, socket.id);
-      if (rtcResponse) sendResponse(rtcResponse);
-      else {
-        const roomMsgResponse = handleRoomMsg(data, socket.id);
-        if (roomMsgResponse instanceof Promise)
-          roomMsgResponse.then((result) => sendResponse(result));
+      // RTC messages (message type "0")
+      // dont need processing, just forwarding
+      if (data.type === "0") {
+        const { target, ...rtcData } = data.data;
+        return sendResponse({
+          message: { type: "0", data: { source: socket.id, ...rtcData } },
+          targets: [target],
+        });
       }
+
+      const roomMsgResponse = handleRoomMsg(data, socket.id);
+      if (roomMsgResponse instanceof Promise)
+        roomMsgResponse.then((result) => sendResponse(result));
     }
   });
 };

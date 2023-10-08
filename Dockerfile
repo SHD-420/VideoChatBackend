@@ -1,18 +1,20 @@
-FROM node:18
+FROM node:18-slim AS base
 
-# create app directory
-WORKDIR /usr/src/app
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
 
-# Install app dependencies
-# A wildcard is used to ensure both package.json AND package-lock.json are copied
-# where available (npm@5+)
-COPY package*.json ./
-RUN npm install
+RUN corepack enable
 
-# Bundle app source
-COPY . .
+COPY . /app
+WORKDIR /app
+
+FROM base AS prod-deps
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --prod --frozen-lockfile
+
+FROM base
+COPY --from=prod-deps /app/node_modules /app/node_modules
 
 # PORT
 EXPOSE 8000
 
-CMD ["npm","start"]
+CMD ["pnpm","start"]

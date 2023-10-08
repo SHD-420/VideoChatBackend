@@ -1,9 +1,31 @@
 const fs = require("node:fs/promises");
+const fsSync = require("node:fs");
 const path = require("node:path");
 const { getAllRooms } = require("./redis-handler/helpers");
 
 const clientDir = path.join(__dirname, "..", "client");
 const { IncomingMessage, ServerResponse } = require("http");
+
+//
+// Read ../client directory and store all possible paths in "clientFiles";
+//
+//
+
+/** @var {string[]} */
+const clientFiles = [];
+
+function readDirectory(parentDir) {
+  // using fs "sync" functions is fine because this code is evaluated
+  const items = fsSync.readdirSync(parentDir);
+  items.forEach((item) => {
+    // don't include index.html in listing
+    if (item === "index.html") return;
+    const dir = path.join(parentDir, item);
+    if (fsSync.lstatSync(dir).isDirectory()) readDirectory(dir);
+    clientFiles.push(dir);
+  });
+}
+readDirectory(clientDir);
 
 /**
  * @param {IncomingMessage} req
@@ -17,9 +39,10 @@ module.exports.httpRequestListener = (req, res) => {
     return;
   }
 
-  // Serve static content
-  if (req.url.startsWith("/assets") || req.url === "favicon.ico") {
-    fs.readFile(path.join(clientDir, req.url))
+  // serve statically if requested url exists in client directory
+  const urlPath = path.join(clientDir, req.url);
+  if (clientFiles.includes(urlPath)) {
+    fs.readFile(urlPath)
       .then((data) => {
         res.statusCode = 200;
         res.setHeader("content-type", getMimetype(req.url));
